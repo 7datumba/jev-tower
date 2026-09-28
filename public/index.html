@@ -60,9 +60,19 @@
   .hero{display:flex;align-items:baseline;gap:10px;margin:6px 0}
   .hero .hv{font-size:30px;color:#d0a030}
   .hero .hk{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
-</style></head><body>
+  body.video aside{width:470px}
+  body.video .stat .v{font-size:26px}body.video .stat .k{font-size:10.5px}
+  body.video .j{font-size:15px;padding:9px 10px}body.video .j .ms{font-size:12px}
+  body.video .chip{font-size:12px}
+  body.video header h1{font-size:20px}body.video .badge{font-size:12px}
+  body.video .caveat{font-size:12.5px}
+  body.video .legend{font-size:13px;padding:10px 13px}body.video .legend .note{font-size:11.5px;max-width:300px}
+  body.video #inspect h2{font-size:16px}body.video .ev-row{font-size:13px}body.video .hero .hv{font-size:38px}body.video .hero .hk{font-size:11px}
+  body.video #foot{font-size:11.5px}
+</style><style>body.video{overflow:hidden}body.video::-webkit-scrollbar{display:none}</style></head><body>
 <header><h1><b>JEV</b> TOWER</h1><span class="badge" id="mode">CONNECTING</span>
-<div class="caveat">Live ADS-B traffic over the SF Bay (data: adsb.lol). Every conflict judgment is a real Jev model call. Reroutes are VIRTUAL - no real aircraft receives instructions. Click any plane or conflict line to inspect the evidence.</div></header>
+<div class="caveat" id="caveat">Live ADS-B traffic over the SF Bay (data: adsb.lol). Every conflict judgment is a real Jev model call. Reroutes are VIRTUAL - no real aircraft receives instructions. Click any plane or conflict line to inspect the evidence.</div></header>
+<script>if(location.hash.includes('video'))document.addEventListener('DOMContentLoaded',()=>document.body.classList.add('video'));</script>
 <main><div style="flex:1;position:relative;min-width:0"><div id="map" style="position:absolute;inset:0"></div>
 <div class="legend"><span class="sw"></span>tracked aircraft<br><span class="sw watch"></span>on Jev's watch (flagged)<br><span class="sw conf"></span>vet confirmed - separation loss<br><span class="ring"></span>projected closest point of approach
 <div class="note">physics p = conflict probability from trajectory uncertainty (method: Paielli &amp; Erzberger, NASA 1997).<br>watch % = Jev triage score, not crash odds.<br>this measures separation-standard margins; real ATC is flying these planes.</div></div></div>
@@ -185,14 +195,15 @@ function renderInspect(byId,info){
 map.on('click',()=>{sel=null;render();});
 // video demo mode: #autoselect cycles through the hottest vet-confirmed pairs
 if(location.hash.includes('autoselect')){
-  setInterval(()=>{
+  const pick=()=>{
     const infos=Object.values(S&&S.pairInfo||{}).filter(i=>i.confirmed).sort((a,b)=>(b.physP||0)-(a.physP||0));
     if(!infos.length)return;
     const cur=sel&&sel.type==='pair'?infos.findIndex(i=>i.a+'|'+i.b===sel.key):-1;
     const next=infos[(cur+1)%Math.min(infos.length,4)];
     sel={type:'pair',key:next.a+'|'+next.b};
     render();
-  },14000);
+  };
+  setTimeout(pick,3000); setInterval(pick,14000);
   setInterval(()=>{ if(sel&&sel.type==='pair'&&!(S&&S.pairInfo&&S.pairInfo[sel.key])){sel=null;render();} },5000);
 }
 async function poll(){
@@ -204,7 +215,7 @@ async function poll(){
     document.getElementById('s-p50').textContent=m.p50;document.getElementById('s-p95').textContent=m.p95;
     document.getElementById('s-conf').textContent=m.conflicts;document.getElementById('s-watch').textContent=m.watchFlags;
     document.getElementById('s-cost').textContent='$'+m.costPerHour;document.getElementById('s-total').textContent=m.totalJudgments.toLocaleString();
-    document.getElementById('mode').textContent=m.mode==='jev'?(m.replay?'REPLAY - JEV':'SANDBOX LIVE - JEV'):'SANDBOX LIVE - MOCK JUDGE';
+    document.getElementById('mode').textContent=m.replay?`REPLAY ${m.replaySpeed}x SPEED - RECORDED BAY TRAFFIC - LIVE JEV CALLS`:(m.mode==='jev'?'SANDBOX LIVE - JEV':'SANDBOX LIVE - MOCK JUDGE');
     const f=document.getElementById('feed');
     f.innerHTML=(S.judgments||[]).slice(-40).reverse().map(j=>{
       const hot=j.p!=null&&j.p>0.6;
@@ -214,6 +225,7 @@ async function poll(){
       return `<div class="j ${hot?'hot':''}" onclick="sel={type:'pair',key:'${j.a}|${j.b}'};render()"><span class="ms">${j.ms}ms</span><span class="chip c${tc}">${tier}</span> ${j.confirmed?'<span class="chip c3">vet confirmed</span>':''}<br><b>${j.a} &times; ${j.b}</b><br>physics <span class="p" style="color:#d0a030">${phys!=null?phys+'%':'-'}</span><span class="meter phys"><i style="width:${phys||0}%"></i></span><br>jev watch ${j.p!=null?(j.p*100).toFixed(0)+'%':'-'}<span class="meter"><i style="width:${j.p!=null?(j.p*100).toFixed(0):0}%"></i></span><br><span style="color:var(--dim)">CPA ${j.cpaNm}nm in ${j.tSec}s</span></div>`;
     }).join('')+(S.reroutes||[]).slice(-6).reverse().map(r=>`<div class="j reroute">REROUTE ${r.flight} &rarr; <span class="p">${String(r.action).replace(/_/g,' ')}</span> ${r.p?(Math.max(...Object.values(r.p))*100).toFixed(0)+'%':''}</div>`).join('');
     render();
+    if(m.replay)document.getElementById('caveat').innerHTML=`RECORDED SF Bay traffic (data: adsb.lol) replayed at <b style="color:var(--acc)">${m.replaySpeed}x speed</b> so plane motion is visible. Positions are interpolated between recorded fixes. Every judgment is a live Jev model call on the replayed geometry. Reroutes are VIRTUAL - no real aircraft receives instructions.`;
   }catch(e){}
   setTimeout(poll,1000);
 }
