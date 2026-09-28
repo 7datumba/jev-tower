@@ -8,7 +8,7 @@ import { makeMockJudge, makeJevJudge } from './judge.mjs';
 const MODE = process.env.JUDGE || 'mock';
 const judge = MODE === 'jev' ? makeJevJudge(process.env.TYPESAFE_API_KEY) : makeMockJudge();
 const feed = process.env.FEED === 'replay'
-  ? makeReplayFeed(process.env.REPLAY_FILE || '/tmp/feed-record.jsonl', onTick, +(process.env.REPLAY_SPEED || 1))
+  ? makeReplayFeed(process.env.REPLAY_FILE || './data/feed-replay.jsonl', onTick, +(process.env.REPLAY_SPEED || 1))
   : makeFeed(onTick, { recordPath: process.env.RECORD_PATH || null });
 
 const state = {

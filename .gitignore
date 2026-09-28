@@ -1,3 +1,5 @@
 node_modules/
-*_key.txt
 .env
+*.log
+*_key.txt
+.DS_Store

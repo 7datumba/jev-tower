@@ -1,16 +1,18 @@
 {
-  "name": "jev-atc",
+  "name": "jev-tower",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "AI air traffic control over the SF Bay: Jev (TypeSafe) judges live aircraft-pair conflict risk inside an E2B sandbox control loop, deterministic physics does the final vet",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.mjs",
+    "replay": "FEED=replay REPLAY_SPEED=20 node server.mjs",
+    "tower": "node tower.mjs",
+    "deploy": "node deploy.mjs",
+    "deploy:replay": "node deploy-replay.mjs"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": ["adsb", "atc", "jev", "typesafe", "e2b", "conflict-probability"],
+  "license": "MIT",
   "dependencies": {
-    "ai": "^7.0.119",
     "e2b": "^2.51.0"
   }
 }
