@@ -183,9 +183,9 @@ function renderInspect(byId,info){
       :inf.confirmed?'CONFIRMED - loss underway without action':'cleared by deterministic CPA rule';
     const phys=inf.physP!=null?inf.physP:null;
     el.innerHTML=`<h2><b>${inf.a}</b> &times; <b>${inf.b}</b> <span class="chip c${tierCls}" style="float:right">${tier}</span></h2>
-      <div class="hero"><span class="hv">${phys!=null?(phys*100).toFixed(0)+'%':'-'}</span><span class="hk">P(separation loss)<br>physics model - P(inside 3 NM / 1000 ft),<br>not crash odds</span></div>
-      <div class="ev-row"><span class="lbl">jev watch triage</span><span class="meter"><i style="width:${(p*100).toFixed(0)}%"></i></span><b>${(p*100).toFixed(0)}%</b> how worth-a-look Jev rates this pair</div>
+      <div class="hero"><span class="hv">${inf.p!=null?(p*100).toFixed(0)+'%':'-'}</span><span class="hk">jev watch<br>how worth-a-look Jev rates this pair -<br>triage, not crash odds</span></div>
       <div class="ev-row"><span class="lbl">separation vet</span><b style="color:${inf.confirmed?'var(--acc)':'var(--ok)'}">${vetTxt}</b> (code, not model)</div>
+      <div class="ev-row"><span class="lbl">physics check</span><b>${phys!=null?(phys*100).toFixed(0)+'%':'-'}</b> P(separation loss), trajectory-uncertainty model - the referee Jev is audited against</div>
       <div class="ev-row"><span class="lbl">now</span><b>${inf.hNmNow} nm apart &middot; ${inf.vFtNow} ft vertical &middot; ${inf.closingKt>0?'closing '+inf.closingKt+' kt':inf.closingKt<0?'diverging '+(-inf.closingKt)+' kt':'parallel'}</b></div>
       <div class="ev-row"><span class="lbl">CPA</span><b>${inf.cpaNm} nm / ${inf.cpaFt} ft in ${inf.tSec} s</b> (orange rings on map)</div>
       ${inf.risk&&inf.risk.probabilities?`<div class="ev-row"><span class="lbl">risk score</span><b>${inf.risk.score}/4</b> full distribution:</div>${bars(inf.risk.probabilities)}`:''}
@@ -215,7 +215,7 @@ if(location.hash.includes('autoselect')){
     render();
   };
   setTimeout(pick,3000); setInterval(pick,14000);
-  setInterval(()=>{ if(sel&&sel.type==='pair'&&!(S&&S.pairInfo&&S.pairInfo[sel.key])){sel=null;render();} },5000);
+  setInterval(()=>{ if(sel&&sel.type==='pair'&&!(S&&S.pairInfo&&S.pairInfo[sel.key])){sel=null;pick();} },3000);
 }
 async function poll(){
   try{
