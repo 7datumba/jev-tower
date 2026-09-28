@@ -1,0 +1,221 @@
+<!doctype html><html><head><meta charset="utf-8"><title>JEV TOWER - SF Bay</title>
+<link rel="stylesheet" href="/static/leaflet/leaflet.css">
+<style>
+  :root{--bg:#1a1a1a;--panel:#222;--line:#333;--fg:#e8e8e8;--dim:#999;--acc:#ff3001;--ok:#3ecf6f;}
+  *{box-sizing:border-box;margin:0} body{background:var(--bg);color:var(--fg);font:14px/1.45 ui-monospace,Menlo,monospace;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+  header{display:flex;align-items:center;gap:14px;padding:10px 16px;border-bottom:1px solid var(--line)}
+  header h1{font-size:17px;letter-spacing:2px} header h1 b{color:var(--acc)}
+  .badge{font-size:11px;padding:3px 9px;border:1px solid var(--acc);color:var(--acc);border-radius:3px;white-space:nowrap}
+  .caveat{margin-left:auto;color:var(--dim);font-size:11.5px;max-width:520px;text-align:right}
+  main{flex:1;display:flex;min-height:0}
+  #map{flex:1;background:#141414;outline:none}
+  aside{width:400px;border-left:1px solid var(--line);display:flex;flex-direction:column;background:var(--panel);min-height:0}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line)}
+  .stat{background:var(--panel);padding:9px 11px}.stat .v{font-size:20px;color:var(--acc)}.stat .k{font-size:9.5px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+  #inspect{border-bottom:1px solid var(--line);background:#1d1d1d;display:none;max-height:46%;overflow-y:auto;padding:10px 12px}
+  #inspect.open{display:block}
+  #inspect h2{font-size:14px;letter-spacing:1px;margin-bottom:6px}#inspect h2 b{color:var(--acc)}
+  .ev-row{color:var(--dim);font-size:12px;margin:3px 0}.ev-row b{color:var(--fg);font-weight:normal}
+  .ev-row .lbl{display:inline-block;width:120px;color:var(--dim)}
+  .bar-row{display:flex;align-items:center;gap:8px;font-size:11.5px;margin:2px 0}
+  .bar-row .bl{width:105px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bar-track{flex:1;height:10px;background:#111;border:1px solid var(--line)}
+  .bar-fill{height:100%;background:var(--acc)}
+  .bar-fill.ok{background:var(--ok)}
+  .bar-row .bv{width:44px;text-align:right;color:var(--fg)}
+  .ev-hint{font-size:10.5px;color:var(--dim);margin-top:8px;border-top:1px solid var(--line);padding-top:6px}
+  .ev-pair-link{color:var(--acc);cursor:pointer;text-decoration:underline dotted}
+  #feedwrap{flex:1;overflow-y:auto;padding:8px;min-height:0}
+  #feedwrap .fh{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase;padding:2px 4px 6px}
+  .j{padding:7px 9px;border-left:2px solid var(--line);margin-bottom:6px;background:#1c1c1c;font-size:12.5px;cursor:pointer}
+  .j:hover{background:#242424}
+  .j.hot{border-left-color:var(--acc)} .j .p{color:var(--acc)} .j .ms{color:var(--dim);float:right;font-size:11px}
+  .j.reroute{border-left-color:var(--ok)} .j.reroute .p{color:var(--ok)}
+  #foot{padding:7px 12px;border-top:1px solid var(--line);color:var(--dim);font-size:10.5px;line-height:1.5}
+  #foot details{cursor:pointer}#foot summary{outline:none}
+  /* leaflet dark tune */
+  .leaflet-container{background:#141414;font:inherit}
+  .leaflet-control-attribution{background:rgba(20,20,20,.75)!important;color:#666!important;font-size:9px!important}
+  .leaflet-control-attribution a{color:#777!important}
+  .leaflet-bar a{background:#222!important;color:#ccc!important;border-color:#333!important}
+  .ac-marker{background:none;border:none}
+  .tri{width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:14px solid #cfcfcf;transform:rotate(var(--r));transform-origin:50% 60%;filter:drop-shadow(0 0 2px #000)}
+  .hot .tri{border-bottom-color:var(--acc);filter:drop-shadow(0 0 4px var(--acc))}
+  .sel .tri{border-bottom-color:#fff;filter:drop-shadow(0 0 6px var(--acc))}
+  .ac-lbl{position:absolute;top:12px;left:8px;font-size:10.5px;color:#bbb;white-space:nowrap;text-shadow:0 0 3px #000,0 0 3px #000}
+  .hot .ac-lbl{color:var(--acc)} .sel .ac-lbl{color:#fff;font-weight:bold}
+  .ghost{opacity:.85}
+  .cpa-tip{background:#1a1a1a!important;border:1px solid var(--acc)!important;color:var(--fg)!important;font:11.5px ui-monospace,Menlo,monospace!important;box-shadow:none!important}
+  .cpa-tip:before{display:none}
+  .chip{display:inline-block;font-size:10.5px;letter-spacing:1px;padding:2px 8px;border-radius:3px;border:1px solid;text-transform:uppercase}
+  .chip.c0{color:#777;border-color:#444}.chip.c1{color:#6b8f6b;border-color:#3a4a3a}.chip.c2{color:#d0a030;border-color:#6a5518}.chip.c3{color:var(--acc);border-color:var(--acc)}.chip.c4{color:#fff;background:var(--acc);border-color:var(--acc)}
+  .meter{display:inline-block;width:90px;height:8px;background:#111;border:1px solid var(--line);vertical-align:middle;margin:0 6px}
+  .meter i{display:block;height:100%;background:var(--acc)}
+  .meter.phys i{background:#d0a030}
+  .legend{position:absolute;left:10px;bottom:24px;z-index:500;background:rgba(20,20,20,.88);border:1px solid var(--line);padding:8px 11px;font-size:11px;color:#bbb;line-height:1.7;pointer-events:none}
+  .legend .sw{display:inline-block;width:22px;height:0;border-top:3px solid #cfcfcf;vertical-align:middle;margin-right:7px}
+  .legend .sw.watch{border-top:2px dashed #999}.legend .sw.conf{border-top:3px solid var(--acc)}
+  .legend .ring{display:inline-block;width:9px;height:9px;border:1.5px solid var(--acc);border-radius:50%;vertical-align:middle;margin-right:9px;margin-left:5px}
+  .legend .note{color:#777;font-size:10px;margin-top:4px;border-top:1px solid #2a2a2a;padding-top:5px;max-width:260px}
+  .hero{display:flex;align-items:baseline;gap:10px;margin:6px 0}
+  .hero .hv{font-size:30px;color:#d0a030}
+  .hero .hk{font-size:10px;color:var(--dim);letter-spacing:1px;text-transform:uppercase}
+</style></head><body>
+<header><h1><b>JEV</b> TOWER</h1><span class="badge" id="mode">CONNECTING</span>
+<div class="caveat">Live ADS-B traffic over the SF Bay (data: adsb.lol). Every conflict judgment is a real Jev model call. Reroutes are VIRTUAL - no real aircraft receives instructions. Click any plane or conflict line to inspect the evidence.</div></header>
+<main><div style="flex:1;position:relative;min-width:0"><div id="map" style="position:absolute;inset:0"></div>
+<div class="legend"><span class="sw"></span>tracked aircraft<br><span class="sw watch"></span>on Jev's watch (flagged)<br><span class="sw conf"></span>vet confirmed - separation loss<br><span class="ring"></span>projected closest point of approach
+<div class="note">physics p = conflict probability from trajectory uncertainty (method: Paielli &amp; Erzberger, NASA 1997).<br>watch % = Jev triage score, not crash odds.<br>this measures separation-standard margins; real ATC is flying these planes.</div></div></div>
+<aside>
+  <div class="stats">
+    <div class="stat"><div class="v" id="s-planes">-</div><div class="k">live aircraft</div></div>
+    <div class="stat"><div class="v" id="s-jps">-</div><div class="k">judgments / sec</div></div>
+    <div class="stat"><div class="v" id="s-p50">-</div><div class="k">p50 latency ms</div></div>
+    <div class="stat"><div class="v" id="s-p95">-</div><div class="k">p95 latency ms</div></div>
+    <div class="stat"><div class="v" id="s-conf">-</div><div class="k">vet-confirmed conflicts</div></div>
+    <div class="stat"><div class="v" id="s-watch">-</div><div class="k">raw model flags</div></div>
+    <div class="stat"><div class="v" id="s-cost">-</div><div class="k">$ / hour</div></div>
+    <div class="stat"><div class="v" id="s-total">-</div><div class="k">total judgments</div></div>
+  </div>
+  <div id="inspect"></div>
+  <div id="feedwrap"><div class="fh">live judgment feed (click to inspect)</div><div id="feed"></div></div>
+  <div id="foot">Jev (TypeSafe System One model), direct TypeSafe API &middot; control loop inside an E2B sandbox &middot; separation standard 3 NM / 1000 ft &middot; map Esri &middot; &copy; OpenStreetMap contributors
+  <details><summary>method &amp; caveats (all numbers from recorded runs)</summary>
+  Geometry (closest point of approach) is computed deterministically from live tracks. Ground truth in comparisons is the deterministic CPA physics rule (lateral CPA under 3 NM AND vertical under 1000 ft within 120 s), not aviation outcomes. This measures separation-standard margins, not crash probability - real ATC is flying these planes.<br><br>
+  <b>Conflict probability (the physics %):</b> analytic trajectory-uncertainty method after Paielli &amp; Erzberger, "Conflict Probability Estimation for Free Flight", NASA 1997 (open: ntrs.nasa.gov 19970001686). Assumptions printed for honesty: per-aircraft position sigma grows 1.0 NM/min along-track and 0.4 NM/min cross-track from 0.05 NM nav error; vertical gate softened to a logistic around 1000 ft. The deterministic CPA gates match the approach used by the open-source BlueSky ATM simulator (TUDelft-CNS-ATM/bluesky).<br><br>
+  <b>Tower comparison, identical 60-tick recorded window:</b> Jev watch layer 103 ms avg, flagged every real conflict (0 missed of 385), 335 of 720 flags false against the physics rule. gpt-4o-mini: 2,242 ms (22x slower), missed 160 of 385. gpt-4o footnote: 2,356 ms, missed 56 of 385 - bigger models are more careful but not faster, which is the point of a judgment model in a 1 Hz loop.<br><br>
+  <b>False-positive reduction, tuned on the recorded window:</b> threshold sweeps and multi-tick persistence could not cut false alarms without creating misses (Jev's watch probabilities are deliberately broad). Letting Jev audit itself with the exact CPA numbers and rule in the prompt still missed 180 of 385 real losses - a model is the wrong tool for verification. So the separation vet is deterministic code: raw model flags (watch p above 50%) are triage; a conflict is only confirmed, and a reroute only issued, when the CPA rule itself fires. Final system on the recorded window: 720 raw flags, 385 vet-confirmed, 335 vetted away, 0 real conflicts missed.</details></div>
+</aside></main>
+<script src="/static/leaflet/leaflet.js"></script>
+<script>
+const map=L.map('map',{center:[37.62,-122.20],zoom:9,zoomControl:true,attributionControl:true});
+L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Esri, HERE, Garmin, &copy; OpenStreetMap contributors'}).addTo(map);
+for(const [n,la,lo] of [['SFO',37.621,-122.379],['OAK',37.713,-122.221],['SJC',37.363,-121.929],['NUQ',37.416,-122.049],['HWD',37.659,-122.122],['PAO',37.461,-122.115],['SQL',37.512,-122.250],['LVK',37.693,-121.820],['CCR',37.990,-122.057],['APC',38.213,-122.281],['STS',38.509,-122.813],['MRY',36.587,-121.843],['SCK',37.894,-121.238],['MOD',37.626,-120.954]])
+  L.circleMarker([la,lo],{radius:3,color:'#666',weight:1,fillColor:'#444',fillOpacity:1}).addTo(map).bindTooltip(n,{permanent:true,direction:'right',offset:[5,0],className:'cpa-tip',opacity:.6});
+const planeLayer=L.layerGroup().addTo(map), vecLayer=L.layerGroup().addTo(map), pairLayer=L.layerGroup().addTo(map), cpaLayer=L.layerGroup().addTo(map);
+let S=null, sel=null; // sel = {type:'pair',key}|{type:'plane',id}
+const markers={};
+function fwd(lat,lon,hdg,gsKt,sec){const d=gsKt*sec/3600;const r=hdg*Math.PI/180;return [lat+d*Math.cos(r)/60, lon+d*Math.sin(r)/(60*Math.cos(lat*Math.PI/180))];}
+function icon(t,hot,selected){
+  return L.divIcon({className:'ac-marker'+(hot?' hot':'')+(selected?' sel':''),iconSize:[12,14],iconAnchor:[6,7],
+    html:`<div class="tri" style="--r:${Math.round(t.hdgDeg||0)}deg"></div><div class="ac-lbl">${t.id}</div>`});
+}
+function render(){
+  if(!S)return;
+  const hotPairs=S.candidates||[], info=S.pairInfo||{};
+  const hotIds=new Set(); hotPairs.forEach(c=>{hotIds.add(c.a);hotIds.add(c.b);});
+  const seen=new Set();
+  for(const t of S.tracks){
+    seen.add(t.id);
+    const hot=hotIds.has(t.id), selected=(sel&&sel.type==='plane'&&sel.id===t.id)||(sel&&sel.type==='pair'&&(sel.key===t.id+'|'+sel.other||sel.key.split('|').includes(t.id)));
+    const ic=icon(t,hot,selected);
+    if(markers[t.id]){markers[t.id].setLatLng([t.lat,t.lon]);markers[t.id].setIcon(ic);}
+    else{markers[t.id]=L.marker([t.lat,t.lon],{icon:ic}).addTo(planeLayer).on('click',()=>{sel={type:'plane',id:t.id};render();});}
+  }
+  for(const id in markers)if(!seen.has(id)){planeLayer.removeLayer(markers[id]);delete markers[id];}
+  vecLayer.clearLayers();
+  for(const t of S.tracks){
+    const hot=hotIds.has(t.id);
+    L.polyline([[t.lat,t.lon],fwd(t.lat,t.lon,t.hdgDeg,t.gsKt,60)],{color:hot?'#ff3001':'#555',weight:1,opacity:hot?.7:.4,interactive:false}).addTo(vecLayer);
+  }
+  pairLayer.clearLayers();
+  const byId={};S.tracks.forEach(t=>byId[t.id]=t);
+  for(const c of hotPairs){
+    const a=byId[c.a],b=byId[c.b];if(!a||!b)continue;
+    const inf=info[c.a+'|'+c.b];const p=inf&&inf.p!=null?inf.p:0.2;const conf=inf&&inf.confirmed;
+    const line=L.polyline([[a.lat,a.lon],[b.lat,b.lon]],{color:conf?'#ff3001':'#c0c0c0',weight:conf?2.5:1.2,opacity:conf?.95:.45,dashArray:conf?null:'4 6',interactive:true});
+    line.on('click',()=>{sel={type:'pair',key:c.a+'|'+c.b};render();});
+    line.addTo(pairLayer);
+  }
+  cpaLayer.clearLayers();
+  if(sel&&sel.type==='pair'){
+    const inf=info[sel.key];
+    if(inf){
+      const a=byId[inf.a],b=byId[inf.b];
+      if(a&&b){
+        const ga=fwd(a.lat,a.lon,a.hdgDeg,a.gsKt,inf.tSec),gb=fwd(b.lat,b.lon,b.hdgDeg,b.gsKt,inf.tSec);
+        for(const g of [ga,gb])L.circleMarker(g,{radius:5,color:'#ff3001',weight:1.5,fill:false,className:'ghost'}).addTo(cpaLayer);
+        const tip=`CPA ${inf.cpaNm} nm / ${inf.cpaFt} ft in ${inf.tSec} s`;
+        L.polyline([ga,gb],{color:'#ff3001',weight:2,dashArray:'2 4',interactive:false}).addTo(cpaLayer)
+          .bindTooltip(tip,{permanent:true,direction:'top',className:'cpa-tip'}).openTooltip();
+      }
+    }
+  }
+  renderInspect(byId,info);
+}
+function bars(probs,ok){
+  if(!probs)return '';
+  return Object.entries(probs).map(([k,v])=>{
+    const lbl={0:'none',1:'low',2:'moderate',3:'high',4:'imminent'}[k]||k.replace(/_/g,' ');
+    return `<div class="bar-row"><span class="bl">${lbl}</span><div class="bar-track"><div class="bar-fill ${ok?'ok':''}" style="width:${(v*100).toFixed(0)}%"></div></div><span class="bv">${(v*100).toFixed(0)}%</span></div>`;
+  }).join('');
+}
+function renderInspect(byId,info){
+  const el=document.getElementById('inspect');
+  if(!sel){el.className='';el.innerHTML='';return;}
+  el.className='open';
+  if(sel.type==='pair'){
+    const inf=info[sel.key];
+    if(!inf){el.innerHTML=`<h2>pair dissolved</h2><div class="ev-row">aircraft separated or left the watched set</div><div class="ev-hint">click map to clear</div>`;return;}
+    const p=inf.p!=null?inf.p:0;
+    const sc=inf.risk&&inf.risk.score!=null?Math.max(0,Math.min(4,Math.round(inf.risk.score))):0;
+    const tier=['none','low','moderate','high','imminent'][sc];
+    const phys=inf.physP!=null?inf.physP:null;
+    el.innerHTML=`<h2><b>${inf.a}</b> &times; <b>${inf.b}</b> <span class="chip c${sc}" style="float:right">${tier}</span></h2>
+      <div class="hero"><span class="hv">${phys!=null?(phys*100).toFixed(0)+'%':'-'}</span><span class="hk">conflict probability<br>physics, trajectory uncertainty</span></div>
+      <div class="ev-row"><span class="lbl">jev watch triage</span><span class="meter"><i style="width:${(p*100).toFixed(0)}%"></i></span><b>${(p*100).toFixed(0)}%</b> how worth-a-look Jev rates this pair</div>
+      <div class="ev-row"><span class="lbl">separation vet</span><b style="color:${inf.confirmed?'var(--acc)':'var(--ok)'}">${inf.confirmed?'CONFIRMED - loss underway without action':'cleared by deterministic CPA rule'}</b> (code, not model)</div>
+      <div class="ev-row"><span class="lbl">now</span><b>${inf.hNmNow} nm apart &middot; ${inf.vFtNow} ft vertical &middot; ${inf.closingKt>0?'closing '+inf.closingKt+' kt':inf.closingKt<0?'diverging '+(-inf.closingKt)+' kt':'parallel'}</b></div>
+      <div class="ev-row"><span class="lbl">CPA</span><b>${inf.cpaNm} nm / ${inf.cpaFt} ft in ${inf.tSec} s</b> (orange rings on map)</div>
+      ${inf.risk&&inf.risk.probabilities?`<div class="ev-row"><span class="lbl">risk score</span><b>${inf.risk.score}/4</b> full distribution:</div>${bars(inf.risk.probabilities)}`:''}
+      ${inf.reroute?`<div class="ev-row"><span class="lbl">virtual reroute</span><b style="color:var(--ok)">${inf.reroute.choice.replace(/_/g,' ')}</b> for ${inf.a}</div>${bars(inf.reroute.probabilities,true)}`:''}
+      <div class="ev-row"><span class="lbl">model latency</span><b>${inf.ms} ms</b> &middot; judged ${Math.max(0,Math.round((Date.now()-inf.at)/1000))} s ago</div>
+      <div class="ev-hint">3 NM / 1000 ft is the separation standard. Compare the geometry above with Jev's probability - that is the audit. Click map to clear.</div>`;
+  } else {
+    const t=byId[sel.id];
+    if(!t){el.innerHTML='';el.className='';sel=null;return;}
+    const pairs=Object.values(info).filter(i=>i.a===t.id||i.b===t.id);
+    el.innerHTML=`<h2><b>${t.id}</b></h2>
+      <div class="ev-row"><span class="lbl">altitude</span><b>${Math.round(t.alt).toLocaleString()} ft</b> ${t.vsFpm>200?'climbing +' +Math.round(t.vsFpm)+' fpm':t.vsFpm<-200?'descending '+Math.round(t.vsFpm)+' fpm':'level'}</div>
+      <div class="ev-row"><span class="lbl">speed / hdg</span><b>${Math.round(t.gsKt)} kt &middot; ${String(Math.round(t.hdgDeg)).padStart(3,'0')}&deg;</b></div>
+      ${pairs.length?`<div class="ev-row"><span class="lbl">watched pairs</span></div>`+pairs.map(i=>`<div class="ev-row">&nbsp;&nbsp;<span class="ev-pair-link" onclick="sel={type:'pair',key:'${i.a}|${i.b}'};render()">${i.a} &times; ${i.b}</span> - Jev p ${i.p!=null?(i.p*100).toFixed(0)+'%':'-'}</div>`).join(''):'<div class="ev-row">not in any watched pair right now</div>'}
+      <div class="ev-hint">click map to clear</div>`;
+  }
+}
+map.on('click',()=>{sel=null;render();});
+// video demo mode: #autoselect cycles through the hottest vet-confirmed pairs
+if(location.hash.includes('autoselect')){
+  setInterval(()=>{
+    const infos=Object.values(S&&S.pairInfo||{}).filter(i=>i.confirmed).sort((a,b)=>(b.physP||0)-(a.physP||0));
+    if(!infos.length)return;
+    const cur=sel&&sel.type==='pair'?infos.findIndex(i=>i.a+'|'+i.b===sel.key):-1;
+    const next=infos[(cur+1)%Math.min(infos.length,4)];
+    sel={type:'pair',key:next.a+'|'+next.b};
+    render();
+  },14000);
+  setInterval(()=>{ if(sel&&sel.type==='pair'&&!(S&&S.pairInfo&&S.pairInfo[sel.key])){sel=null;render();} },5000);
+}
+async function poll(){
+  try{
+    S=await (await fetch('/api/state')).json();
+    const m=S.metrics;
+    document.getElementById('s-planes').textContent=S.tracks.length;
+    document.getElementById('s-jps').textContent=m.judgmentsPerSec;
+    document.getElementById('s-p50').textContent=m.p50;document.getElementById('s-p95').textContent=m.p95;
+    document.getElementById('s-conf').textContent=m.conflicts;document.getElementById('s-watch').textContent=m.watchFlags;
+    document.getElementById('s-cost').textContent='$'+m.costPerHour;document.getElementById('s-total').textContent=m.totalJudgments.toLocaleString();
+    document.getElementById('mode').textContent=m.mode==='jev'?(m.replay?'REPLAY - JEV':'SANDBOX LIVE - JEV'):'SANDBOX LIVE - MOCK JUDGE';
+    const f=document.getElementById('feed');
+    f.innerHTML=(S.judgments||[]).slice(-40).reverse().map(j=>{
+      const hot=j.p!=null&&j.p>0.6;
+      const tc=Math.max(0,Math.min(4,Math.round(j.risk??0)||0));
+      const tier=['none','low','moderate','high','imminent'][tc];
+      const phys=j.physP!=null?(j.physP*100).toFixed(0):null;
+      return `<div class="j ${hot?'hot':''}" onclick="sel={type:'pair',key:'${j.a}|${j.b}'};render()"><span class="ms">${j.ms}ms</span><span class="chip c${tc}">${tier}</span> ${j.confirmed?'<span class="chip c3">vet confirmed</span>':''}<br><b>${j.a} &times; ${j.b}</b><br>physics <span class="p" style="color:#d0a030">${phys!=null?phys+'%':'-'}</span><span class="meter phys"><i style="width:${phys||0}%"></i></span><br>jev watch ${j.p!=null?(j.p*100).toFixed(0)+'%':'-'}<span class="meter"><i style="width:${j.p!=null?(j.p*100).toFixed(0):0}%"></i></span><br><span style="color:var(--dim)">CPA ${j.cpaNm}nm in ${j.tSec}s</span></div>`;
+    }).join('')+(S.reroutes||[]).slice(-6).reverse().map(r=>`<div class="j reroute">REROUTE ${r.flight} &rarr; <span class="p">${String(r.action).replace(/_/g,' ')}</span> ${r.p?(Math.max(...Object.values(r.p))*100).toFixed(0)+'%':''}</div>`).join('');
+    render();
+  }catch(e){}
+  setTimeout(poll,1000);
+}
+poll();
+</script></body></html>

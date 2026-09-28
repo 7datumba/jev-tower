@@ -1,0 +1,28 @@
+tick 10 / 60
+tick 20 / 60
+tick 30 / 60
+tick 40 / 60
+llm err TypeError: fetch failed
+tick 50 / 60
+tick 60 / 60
+{
+ "ticks": 60,
+ "jev": {
+  "avg_ms": 119,
+  "max_ms": 203,
+  "conflicts_flagged": 720,
+  "true_positives": 385,
+  "false_positives": 335,
+  "missed": 0,
+  "input_tokens": 153130
+ },
+ "llm": {
+  "avg_ms": 12318,
+  "max_ms": 17399,
+  "conflicts_flagged": 552,
+  "true_positives": 378,
+  "false_positives": 174,
+  "missed": 0,
+  "total_tokens": 135699
+ }
+}

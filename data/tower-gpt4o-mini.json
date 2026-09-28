@@ -1,0 +1,27 @@
+tick 10 / 60
+tick 20 / 60
+tick 30 / 60
+tick 40 / 60
+tick 50 / 60
+tick 60 / 60
+{
+ "ticks": 60,
+ "jev": {
+  "avg_ms": 103,
+  "max_ms": 211,
+  "conflicts_flagged": 720,
+  "true_positives": 385,
+  "false_positives": 335,
+  "missed": 0,
+  "input_tokens": 153130
+ },
+ "llm": {
+  "avg_ms": 2242,
+  "max_ms": 4374,
+  "conflicts_flagged": 247,
+  "true_positives": 225,
+  "false_positives": 22,
+  "missed": 160,
+  "total_tokens": 54258
+ }
+}

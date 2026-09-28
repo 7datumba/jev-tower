@@ -1,0 +1,22 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+body{background:#111;color:#e8e8e8;font:11px/1.5 ui-monospace,Menlo,monospace;margin:0;padding:8px;overflow:hidden}
+h1{font-size:11px;color:#ff3001;letter-spacing:1px;margin:0 0 6px;border-bottom:1px solid #333;padding-bottom:5px}
+.l{white-space:pre;color:#999}.l b{color:#ff3001;font-weight:normal}.l .ok{color:#3ecf6f}
+</style></head><body><h1>AGENT - JEV CONTROL LOOP (E2B SANDBOX)</h1><div id="log"></div>
+<script>
+const lines=[];const el=document.getElementById('log');
+async function poll(){
+  try{
+    const S=await (await fetch('/api/state')).json();
+    const m=S.metrics;
+    lines.push(`tick ${m.ticks} | ${S.tracks.length} aircraft | ${S.candidates.length} watched pairs`);
+    for(const j of (S.judgments||[]).slice(-2))
+      lines.push(`  jev ${j.a}x${j.b} watch ${j.p!=null?(j.p*100).toFixed(0)+'%':'-'} phys ${j.physP!=null?(j.physP*100).toFixed(0)+'%':'-'} ${j.confirmed?'VET-CONFIRMED':'cleared'} ${j.ms}ms`);
+    lines.push(`  totals: ${m.totalJudgments} judgments | p50 ${m.p50}ms | ${m.watchFlags} raw flags -> ${m.conflicts} confirmed`);
+    while(lines.length>18)lines.shift();
+    el.innerHTML=lines.map(l=>`<div class="l">${l.replace(/(VET-CONFIRMED)/g,'<b>$1</b>').replace(/(cleared)/g,'<span class="ok">$1</span>')}</div>`).join('');
+  }catch(e){}
+  setTimeout(poll,1000);
+}
+poll();
+</script></body></html>

@@ -1,0 +1,18 @@
+import { Sandbox } from 'e2b';
+import { readFileSync } from 'node:fs';
+const apiKey = readFileSync('/tmp/e2b_key.txt','utf8').trim();
+const tsKey = readFileSync('/tmp/ts_key.txt','utf8').trim();
+const sbx = await Sandbox.create({ apiKey, timeoutMs: 3600_000 });
+console.log('sandbox', sbx.sandboxId);
+for (const f of ['geo.mjs','feed.mjs','judge.mjs','server.mjs']) await sbx.files.write(`/home/user/${f}`, readFileSync(f,'utf8'));
+await sbx.files.write('/home/user/public/index.html', readFileSync('public/index.html','utf8'));
+await sbx.files.write('/home/user/public/leaflet/leaflet.js', readFileSync('public/leaflet/leaflet.js','utf8'));
+await sbx.files.write('/home/user/public/leaflet/leaflet.css', readFileSync('public/leaflet/leaflet.css','utf8'));
+await sbx.commands.run(`cd /home/user && JUDGE=jev PORT=8000 TYPESAFE_API_KEY='${tsKey}' nohup node server.mjs > server.log 2>&1 & echo started $!`);
+console.log('server started via nohup');
+await new Promise(r => setTimeout(r, 6000));
+const host = sbx.getHost(8000);
+console.log('URL https://' + host);
+const chk = await fetch('https://' + host + '/api/state');
+const j = await chk.json();
+console.log('live check:', JSON.stringify({tracks: j.tracks.length, cands: j.candidates.length, mode: j.metrics.mode}));
