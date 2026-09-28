@@ -66,6 +66,12 @@
   body.video .chip{font-size:12px}
   body.video header h1{font-size:20px}body.video .badge{font-size:12px}
   body.video .caveat{font-size:12.5px}
+  body.video .stat.x{display:none}
+  body.video #feedwrap{display:none}
+  body.video #foot{display:none}
+  body.video .hero .hv{font-size:64px}
+  body.video aside{scrollbar-width:none}
+  body.video aside::-webkit-scrollbar{display:none}
   body.video .legend{font-size:13px;padding:10px 13px}body.video .legend .note{font-size:11.5px;max-width:300px}
   body.video #inspect h2{font-size:16px}body.video .ev-row{font-size:13px}body.video .hero .hv{font-size:38px}body.video .hero .hk{font-size:11px}
   body.video #foot{font-size:11.5px}
@@ -79,13 +85,13 @@
 <aside>
   <div class="stats">
     <div class="stat"><div class="v" id="s-planes">-</div><div class="k">live aircraft</div></div>
-    <div class="stat"><div class="v" id="s-jps">-</div><div class="k">judgments / sec</div></div>
+    <div class="stat x"><div class="v" id="s-jps">-</div><div class="k">judgments / sec</div></div>
     <div class="stat"><div class="v" id="s-p50">-</div><div class="k">p50 latency ms</div></div>
-    <div class="stat"><div class="v" id="s-p95">-</div><div class="k">p95 latency ms</div></div>
     <div class="stat"><div class="v" id="s-conf">-</div><div class="k">vet-confirmed conflicts</div></div>
-    <div class="stat"><div class="v" id="s-watch">-</div><div class="k">raw model flags</div></div>
+    <div class="stat x"><div class="v" id="s-watch">-</div><div class="k">raw model flags</div></div>
     <div class="stat"><div class="v" id="s-cost">-</div><div class="k">$ / hour</div></div>
-    <div class="stat"><div class="v" id="s-total">-</div><div class="k">total judgments</div></div>
+    <div class="stat" style="display:none"><div class="v" id="s-p95">-</div><div class="k">p95</div></div>
+    <div class="stat" style="display:none"><div class="v" id="s-total">-</div><div class="k">total</div></div>
   </div>
   <div id="inspect"></div>
   <div id="feedwrap"><div class="fh">live judgment feed (click to inspect)</div><div id="feed"></div></div>
@@ -94,7 +100,8 @@
   Geometry (closest point of approach) is computed deterministically from live tracks. Ground truth in comparisons is the deterministic CPA physics rule (lateral CPA under 3 NM AND vertical under 1000 ft within 120 s), not aviation outcomes. This measures separation-standard margins, not crash probability - real ATC is flying these planes.<br><br>
   <b>Conflict probability (the physics %):</b> analytic trajectory-uncertainty method after Paielli &amp; Erzberger, "Conflict Probability Estimation for Free Flight", NASA 1997 (open: ntrs.nasa.gov 19970001686). Assumptions printed for honesty: per-aircraft position sigma grows 1.0 NM/min along-track and 0.4 NM/min cross-track from 0.05 NM nav error; vertical gate softened to a logistic around 1000 ft. The deterministic CPA gates match the approach used by the open-source BlueSky ATM simulator (TUDelft-CNS-ATM/bluesky).<br><br>
   <b>Tower comparison, identical 60-tick recorded window:</b> Jev watch layer 103 ms avg, flagged every real conflict (0 missed of 385), 335 of 720 flags false against the physics rule. gpt-4o-mini: 2,242 ms (22x slower), missed 160 of 385. gpt-4o footnote: 2,356 ms, missed 56 of 385 - bigger models are more careful but not faster, which is the point of a judgment model in a 1 Hz loop.<br><br>
-  <b>False-positive reduction, tuned on the recorded window:</b> threshold sweeps and multi-tick persistence could not cut false alarms without creating misses (Jev's watch probabilities are deliberately broad). Letting Jev audit itself with the exact CPA numbers and rule in the prompt still missed 180 of 385 real losses - a model is the wrong tool for verification. So the separation vet is deterministic code: raw model flags (watch p above 50%) are triage; a conflict is only confirmed, and a reroute only issued, when the CPA rule itself fires. Final system on the recorded window: 720 raw flags, 385 vet-confirmed, 335 vetted away, 0 real conflicts missed.</details></div>
+  <b>False-positive reduction, tuned on the recorded window:</b> threshold sweeps and multi-tick persistence could not cut false alarms without creating misses (Jev's watch probabilities are deliberately broad). Letting Jev audit itself with the exact CPA numbers and rule in the prompt still missed 180 of 385 real losses - a model is the wrong tool for verification. So the separation vet is deterministic code: raw model flags (watch p above 50%) are triage; a conflict is only confirmed, and a reroute only issued, when the CPA rule itself fires. Final system on the recorded window: 720 raw flags, 385 vet-confirmed, 335 vetted away, 0 real conflicts missed.<br><br>
+  <b>Operational context:</b> aircraft on or near the runway surface at SFO/OAK/SJC are excluded from pairing (ground ops are not separation conflicts). Formation flight (matched velocity inside 0.7 NM) and parallel-final arrival pairs (both established on approach to the same field, runway-aligned) are annotated on the panel and not counted as separation losses - the 3 NM / 1000 ft standard does not govern those procedures.</details></div>
 </aside></main>
 <script src="/static/leaflet/leaflet.js"></script>
 <script>
@@ -169,12 +176,16 @@ function renderInspect(byId,info){
     if(!inf){el.innerHTML=`<h2>pair dissolved</h2><div class="ev-row">aircraft separated or left the watched set</div><div class="ev-hint">click map to clear</div>`;return;}
     const p=inf.p!=null?inf.p:0;
     const sc=inf.risk&&inf.risk.score!=null?Math.max(0,Math.min(4,Math.round(inf.risk.score))):0;
-    const tier=['none','low','moderate','high','imminent'][sc];
+    const tier=inf.kind==='formation'?'formation':inf.kind==='parallel'?'parallel final':['none','low','moderate','high','imminent'][sc];
+    const tierCls=inf.kind==='formation'||inf.kind==='parallel'?1:sc;
+    const vetTxt=inf.kind==='formation'?'matched-velocity pair - likely VFR formation; the 3 NM / 1000 ft standard does not govern formation flight'
+      :inf.kind==='parallel'?`both on final for ${inf.field||'the same field'} - tower-separated procedure, not counted as a conflict`
+      :inf.confirmed?'CONFIRMED - loss underway without action':'cleared by deterministic CPA rule';
     const phys=inf.physP!=null?inf.physP:null;
-    el.innerHTML=`<h2><b>${inf.a}</b> &times; <b>${inf.b}</b> <span class="chip c${sc}" style="float:right">${tier}</span></h2>
-      <div class="hero"><span class="hv">${phys!=null?(phys*100).toFixed(0)+'%':'-'}</span><span class="hk">conflict probability<br>physics, trajectory uncertainty</span></div>
+    el.innerHTML=`<h2><b>${inf.a}</b> &times; <b>${inf.b}</b> <span class="chip c${tierCls}" style="float:right">${tier}</span></h2>
+      <div class="hero"><span class="hv">${phys!=null?(phys*100).toFixed(0)+'%':'-'}</span><span class="hk">P(separation loss)<br>physics model - P(inside 3 NM / 1000 ft),<br>not crash odds</span></div>
       <div class="ev-row"><span class="lbl">jev watch triage</span><span class="meter"><i style="width:${(p*100).toFixed(0)}%"></i></span><b>${(p*100).toFixed(0)}%</b> how worth-a-look Jev rates this pair</div>
-      <div class="ev-row"><span class="lbl">separation vet</span><b style="color:${inf.confirmed?'var(--acc)':'var(--ok)'}">${inf.confirmed?'CONFIRMED - loss underway without action':'cleared by deterministic CPA rule'}</b> (code, not model)</div>
+      <div class="ev-row"><span class="lbl">separation vet</span><b style="color:${inf.confirmed?'var(--acc)':'var(--ok)'}">${vetTxt}</b> (code, not model)</div>
       <div class="ev-row"><span class="lbl">now</span><b>${inf.hNmNow} nm apart &middot; ${inf.vFtNow} ft vertical &middot; ${inf.closingKt>0?'closing '+inf.closingKt+' kt':inf.closingKt<0?'diverging '+(-inf.closingKt)+' kt':'parallel'}</b></div>
       <div class="ev-row"><span class="lbl">CPA</span><b>${inf.cpaNm} nm / ${inf.cpaFt} ft in ${inf.tSec} s</b> (orange rings on map)</div>
       ${inf.risk&&inf.risk.probabilities?`<div class="ev-row"><span class="lbl">risk score</span><b>${inf.risk.score}/4</b> full distribution:</div>${bars(inf.risk.probabilities)}`:''}
@@ -219,8 +230,8 @@ async function poll(){
     const f=document.getElementById('feed');
     f.innerHTML=(S.judgments||[]).slice(-40).reverse().map(j=>{
       const hot=j.p!=null&&j.p>0.6;
-      const tc=Math.max(0,Math.min(4,Math.round(j.risk??0)||0));
-      const tier=['none','low','moderate','high','imminent'][tc];
+      const tc=j.kind==='formation'||j.kind==='parallel'?1:Math.max(0,Math.min(4,Math.round(j.risk??0)||0));
+      const tier=j.kind==='formation'?'formation':j.kind==='parallel'?'parallel final':['none','low','moderate','high','imminent'][tc];
       const phys=j.physP!=null?(j.physP*100).toFixed(0):null;
       return `<div class="j ${hot?'hot':''}" onclick="sel={type:'pair',key:'${j.a}|${j.b}'};render()"><span class="ms">${j.ms}ms</span><span class="chip c${tc}">${tier}</span> ${j.confirmed?'<span class="chip c3">vet confirmed</span>':''}<br><b>${j.a} &times; ${j.b}</b><br>physics <span class="p" style="color:#d0a030">${phys!=null?phys+'%':'-'}</span><span class="meter phys"><i style="width:${phys||0}%"></i></span><br>jev watch ${j.p!=null?(j.p*100).toFixed(0)+'%':'-'}<span class="meter"><i style="width:${j.p!=null?(j.p*100).toFixed(0):0}%"></i></span><br><span style="color:var(--dim)">CPA ${j.cpaNm}nm in ${j.tSec}s</span></div>`;
     }).join('')+(S.reroutes||[]).slice(-6).reverse().map(r=>`<div class="j reroute">REROUTE ${r.flight} &rarr; <span class="p">${String(r.action).replace(/_/g,' ')}</span> ${r.p?(Math.max(...Object.values(r.p))*100).toFixed(0)+'%':''}</div>`).join('');

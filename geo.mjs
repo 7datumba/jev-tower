@@ -41,11 +41,43 @@ export function findCandidates(tracks, opts = {}) {
   for (let i = 0; i < tracks.length; i++) for (let j = i+1; j < tracks.length; j++) {
     const a = tracks[i], b = tracks[j];
     if (a.gsKt < 30 || b.gsKt < 30) continue; // skip ground
+    // on or nearly on the runway at a known field: ground ops, not a conflict pair
+    const onGround = t => t.alt <= 100 && FIELDS.some(f => fieldDistNm(t, f) < 3);
+    if (onGround(a) || onGround(b)) continue;
     const r = cpa(a, b);
     if (r.hNmNow < hGateNm && r.vFtNow < vGateFt && r.cpaNm < cpaGateNm && r.tSec <= cpaGateSec)
       out.push({ a: a.id, b: b.id, ...r });
   }
   return out.sort((p, q) => p.cpaNm - q.cpaNm);
+}
+
+
+// --- Operational context: pairs the 3 NM / 1000 ft standard does not govern ---
+// Formation flight (matched velocity, glued together) and parallel-final arrivals
+// (both established on approach to the same field, runway-aligned) are annotated,
+// not counted as separation losses.
+const FIELDS = [
+  { icao: 'SFO', lat: 37.6213, lon: -122.3790, courses: [281] },
+  { icao: 'OAK', lat: 37.7126, lon: -122.2197, courses: [300, 120] },
+  { icao: 'SJC', lat: 37.3639, lon: -121.9289, courses: [300, 120] },
+];
+function hdgDiff(a, b) { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d; }
+function fieldDistNm(t, f) {
+  const dy = (t.lat - f.lat) * 60, dx = (t.lon - f.lon) * 60 * Math.cos(f.lat * Math.PI / 180);
+  return Math.hypot(dx, dy);
+}
+export function classifyPair(a, b, r) {
+  const relKt = Math.hypot(b.vx - a.vx, b.vy - a.vy) / NM_M * 3600;
+  // glued low/slow GA: formation, photo flight, or interp artifact of nearby VFR tracks - the IFR standard does not govern
+  if ((relKt < 25 && r.hNmNow < 1.0) || (r.hNmNow < 0.5 && a.alt < 3000 && b.alt < 3000 && a.gsKt < 120 && b.gsKt < 120)) return { kind: 'formation', field: null };
+  if (a.alt < 3500 && b.alt < 3500 && relKt < 40 && hdgDiff(a.hdgDeg, b.hdgDeg) < 30) {
+    for (const f of FIELDS) {
+      if (fieldDistNm(a, f) < 12 && fieldDistNm(b, f) < 12 &&
+          f.courses.some(c => hdgDiff(a.hdgDeg, c) < 25 && hdgDiff(b.hdgDeg, c) < 25))
+        return { kind: 'parallel', field: f.icao };
+    }
+  }
+  return { kind: 'normal', field: null };
 }
 
 // --- Probabilistic conflict probability (after Paielli & Erzberger, NASA TM-1997-00436) ---

@@ -2,7 +2,7 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { makeFeed, makeReplayFeed } from './feed.mjs';
-import { findCandidates, conflictProb } from './geo.mjs';
+import { findCandidates, conflictProb, classifyPair } from './geo.mjs';
 import { makeMockJudge, makeJevJudge } from './judge.mjs';
 
 const MODE = process.env.JUDGE || 'mock';
@@ -13,15 +13,21 @@ const feed = process.env.FEED === 'replay'
 
 const state = {
   tracks: [], candidates: [], pairInfo: {}, judgments: [], reroutes: [],
-  metrics: { ticks: 0, judgedTicks: 0, totalJudgments: 0, latencies: [], watchFlags: 0, conflicts: 0, nearMissesAvoided: 0, inputTokens: 0, startedAt: Date.now(), feedStale: false, mode: MODE, replay: process.env.FEED === 'replay' },
+  metrics: { ticks: 0, judgedTicks: 0, totalJudgments: 0, latencies: [], watchFlags: 0, conflicts: 0, nearMissesAvoided: 0, inputTokens: 0, startedAt: Date.now(), feedStale: false, mode: MODE, replay: process.env.FEED === 'replay', replaySpeed: +(process.env.REPLAY_SPEED || 1) },
 };
 
 async function onTick({ tracks, stale }) {
   state.tracks = tracks; state.metrics.ticks++; state.metrics.feedStale = !!stale;
-  const cands = findCandidates(tracks).slice(0, 12);
   const byId = {}; for (const t of tracks) byId[t.id] = t;
+  const all = findCandidates(tracks);
+  for (const c of all) {
+    const cls = (byId[c.a] && byId[c.b]) ? classifyPair(byId[c.a], byId[c.b], c) : { kind: 'normal', field: null };
+    c.kind = cls.kind; c.field = cls.field;
+  }
+  all.sort((p, q) => ((p.kind === 'normal' ? 0 : 1) - (q.kind === 'normal' ? 0 : 1)) || p.cpaNm - q.cpaNm); // judge real conflicts first
+  const cands = all.slice(0, 12);
   for (const c of cands) {
-    c.vetConfirmed = (c.cpaNm < 3 && c.cpaFt < 1000 && c.tSec <= 120); // deterministic separation vet
+    c.vetConfirmed = (c.kind === 'normal') && (c.cpaNm < 3 && c.cpaFt < 1000 && c.tSec <= 120); // deterministic separation vet
     try { c.physP = (byId[c.a] && byId[c.b]) ? conflictProb(byId[c.a], byId[c.b]).p : null; } catch { c.physP = null; }
   }
   state.candidates = cands;
@@ -45,12 +51,12 @@ async function onTick({ tracks, stale }) {
         at: Date.now(), a: c.a, b: c.b,
         cpaNm: +c.cpaNm.toFixed(2), cpaFt: Math.round(c.cpaFt), tSec: c.tSec,
         hNmNow: +c.hNmNow.toFixed(2), vFtNow: Math.round(c.vFtNow), closingKt: c.closingKt,
-        p: watchP, confirmed, physP: c.physP ?? null,
+        p: watchP, confirmed, physP: c.physP ?? null, kind: c.kind, field: c.field,
         risk: risk ? { score: risk.score ?? null, probabilities: risk.probabilities || null, confidence: risk.confidence ?? null } : null,
         reroute: confirmed && rr ? { choice: rr.choice, probabilities: rr.probabilities || null } : null,
         ms: r.ms,
       };
-      state.judgments.push({ at: Date.now(), a: c.a, b: c.b, cpaNm: +c.cpaNm.toFixed(2), tSec: c.tSec, p: watchP, confirmed, physP: c.physP ?? null, risk: risk?.score ?? null, ms: r.ms });
+      state.judgments.push({ at: Date.now(), a: c.a, b: c.b, cpaNm: +c.cpaNm.toFixed(2), tSec: c.tSec, kind: c.kind, p: watchP, confirmed, physP: c.physP ?? null, risk: risk?.score ?? null, ms: r.ms });
       if (confirmed) {
         state.metrics.conflicts++;
         if (rr) { state.metrics.nearMissesAvoided++; state.reroutes.push({ at: Date.now(), flight: c.a, action: rr.choice, p: rr.probabilities }); }
