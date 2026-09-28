@@ -85,7 +85,7 @@ const server = http.createServer(async (req, res) => {
       metrics: { ...state.metrics, latencies: undefined,
         p50: pct(0.5), p95: pct(0.95),
         judgmentsPerSec: upMin > 0 ? +(state.metrics.totalJudgments / (upMin * 60)).toFixed(1) : 0,
-        costPerHour: +((state.metrics.inputTokens / Math.max(upMin / 60, 1e-9)) * 0.042 / 1e6).toFixed(3) },
+        costPerHour: +((state.metrics.inputTokens / Math.max(upMin / 60, 1e-9)) * 0.042 / 1e6 / (state.metrics.replay ? state.metrics.replaySpeed : 1)).toFixed(3) },
     }));
     return;
   }
