@@ -68,6 +68,14 @@
   body.video .caveat{font-size:12.5px}
   body.video .stat.x{display:none}
   body.video #feedwrap{display:none}
+  #agentlog{display:none}
+  body.video #agentlog{display:block;flex:1;min-height:0;overflow:hidden;padding:8px 12px;border-top:1px solid var(--line);font:10px/1.5 ui-monospace,Menlo,monospace;color:#999}
+  body.video #inspect{scrollbar-width:none}
+  body.video #inspect::-webkit-scrollbar{display:none}
+  #agentlog h1{font-size:11px;color:var(--acc);letter-spacing:1px;margin:0 0 6px;border-bottom:1px solid #333;padding-bottom:5px}
+  #agentlog .l{white-space:pre}
+  #agentlog .l b{color:var(--acc);font-weight:normal}
+  #agentlog .l .ok{color:#3ecf6f}
   body.video #foot{display:none}
   body.video .hero .hv{font-size:64px}
   body.video aside{scrollbar-width:none}
@@ -95,6 +103,7 @@
   </div>
   <div id="inspect"></div>
   <div id="feedwrap"><div class="fh">live judgment feed (click to inspect)</div><div id="feed"></div></div>
+  <div id="agentlog"><h1>AGENT - JEV CONTROL LOOP (E2B SANDBOX)</h1><div id="alog"></div></div>
   <div id="foot">Jev (TypeSafe System One model), direct TypeSafe API &middot; control loop inside an E2B sandbox &middot; separation standard 3 NM / 1000 ft &middot; map Esri &middot; &copy; OpenStreetMap contributors
   <details><summary>method &amp; caveats (all numbers from recorded runs)</summary>
   Geometry (closest point of approach) is computed deterministically from live tracks. Ground truth in comparisons is the deterministic CPA physics rule (lateral CPA under 3 NM AND vertical under 1000 ft within 120 s), not aviation outcomes. This measures separation-standard margins, not crash probability - real ATC is flying these planes.<br><br>
@@ -217,6 +226,7 @@ if(location.hash.includes('autoselect')){
   setTimeout(pick,3000); setInterval(pick,14000);
   setInterval(()=>{ if(sel&&sel.type==='pair'&&!(S&&S.pairInfo&&S.pairInfo[sel.key])){sel=null;pick();} },3000);
 }
+const alines=[];
 async function poll(){
   try{
     S=await (await fetch('/api/state')).json();
@@ -227,6 +237,12 @@ async function poll(){
     document.getElementById('s-conf').textContent=m.conflicts;document.getElementById('s-watch').textContent=m.watchFlags;
     document.getElementById('s-cost').textContent='$'+m.costPerHour;document.getElementById('s-total').textContent=m.totalJudgments.toLocaleString();
     document.getElementById('mode').textContent=m.replay?`REPLAY ${m.replaySpeed}x SPEED - RECORDED BAY TRAFFIC - LIVE JEV CALLS`:(m.mode==='jev'?'SANDBOX LIVE - JEV':'SANDBOX LIVE - MOCK JUDGE');
+    alines.push(`tick ${m.ticks} | ${S.tracks.length} aircraft | ${S.candidates.length} watched pairs`);
+    for(const j of (S.judgments||[]).slice(-2))
+      alines.push(`  jev ${j.a}x${j.b} watch ${j.p!=null?(j.p*100).toFixed(0)+'%':'-'} phys ${j.physP!=null?(j.physP*100).toFixed(0)+'%':'-'} ${j.confirmed?'VET-CONFIRMED':'cleared'} ${j.ms}ms`);
+    alines.push(`  totals: ${m.totalJudgments} judgments | p50 ${m.p50}ms | ${m.watchFlags} raw flags -> ${m.conflicts} confirmed`);
+    while(alines.length>13)alines.shift();
+    document.getElementById('alog').innerHTML=alines.map(l=>`<div class="l">${l.replace(/(VET-CONFIRMED)/g,'<b>$1<\/b>').replace(/(cleared)/g,'<span class="ok">$1<\/span>')}</div>`).join('');
     const f=document.getElementById('feed');
     f.innerHTML=(S.judgments||[]).slice(-40).reverse().map(j=>{
       const hot=j.p!=null&&j.p>0.6;
